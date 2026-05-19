@@ -1,7 +1,8 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
-import { AlertCircle, Clock, Send, TrendingUp, Brain, Zap } from "lucide-react";
+import { AlertCircle, Clock, Send, TrendingUp, Brain, Zap, Shield, Trophy } from "lucide-react";
+import PentagonChart from "./components/PentagonChart";
 
 interface Question {
   id: number;
@@ -25,6 +26,7 @@ export default function TestEngine() {
   const [isPanicMode, setIsPanicMode] = useState(false);
   const [momentum, setMomentum] = useState(1.0);
   const [message, setMessage] = useState("");
+  const [performance, setPerformance] = useState<any[]>([]);
 
   const fetchQuestion = async () => {
     try {
@@ -43,8 +45,19 @@ export default function TestEngine() {
     }
   };
 
+  const fetchPerformance = async () => {
+    try {
+      const res = await fetch("/api/performance/");
+      const data = await res.json();
+      setPerformance(data);
+    } catch (err) {
+      console.error("Failed to fetch performance", err);
+    }
+  };
+
   useEffect(() => {
     fetchQuestion();
+    fetchPerformance();
 
     const handleVisibilityChange = () => {
       if (document.hidden) {
@@ -116,6 +129,7 @@ export default function TestEngine() {
           setMessage("Warning: Pressure increasing! Panic Mode Activated.");
       }
 
+      fetchPerformance();
       setTimeout(fetchQuestion, 2000);
     } catch (err) {
       console.error("Submission failed", err);
@@ -126,7 +140,36 @@ export default function TestEngine() {
 
   return (
     <div className={`min-h-screen p-8 transition-colors duration-500 ${isPanicMode ? 'bg-red-50' : 'bg-slate-50'}`}>
-      <div className="max-w-4xl mx-auto space-y-6">
+      <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-8">
+
+        {/* Left Sidebar: Radar & Titles */}
+        <div className="lg:col-span-1 space-y-6">
+          <PentagonChart data={performance} />
+
+          <div className="bg-white p-6 rounded-3xl shadow-xl border border-slate-50 space-y-4">
+            <div className="flex items-center space-x-2 text-slate-800 font-black italic uppercase tracking-tighter">
+              <Trophy className="text-yellow-500 w-5 h-5" />
+              <span>Unlocked Titles</span>
+            </div>
+            <div className="space-y-3">
+              {performance.map((p, i) => (
+                <div key={i} className="flex flex-col border-l-4 border-slate-100 pl-4 py-1">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase">{p.subject}</span>
+                  <span className={`text-sm font-bold truncate ${
+                    p.highest_difficulty_reached >= 1000 ? 'glitch font-mono' :
+                    p.highest_difficulty_reached >= 151 ? 'text-red-600' :
+                    p.highest_difficulty_reached >= 101 ? 'text-yellow-600' : 'text-slate-700'
+                  }`}>
+                    {p.current_title}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Main Content */}
+        <div className="lg:col-span-2 space-y-6">
         {/* Header Stats */}
         <div className="flex justify-between items-center bg-white p-4 rounded-xl shadow-sm">
           <div className="flex items-center space-x-4">
@@ -205,6 +248,7 @@ export default function TestEngine() {
             <span>PANIC MODE ACTIVE: STAY FOCUSED</span>
           </div>
         )}
+        </div>
       </div>
     </div>
   );

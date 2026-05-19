@@ -23,6 +23,7 @@ class Question(Base):
     virtual_tier = Column(Integer, default=1) # 1 to 7
     frequency_score = Column(Integer, default=0)
     panic_weight = Column(Float, default=0.0) # How much stress this question usually causes
+    memory_value = Column(Integer, default=0) # 0: unappeared, 100: correct, 50: unattempted, -50: incorrect
 
     attempts = relationship("Attempt", back_populates="question")
 
@@ -49,3 +50,12 @@ class Attempt(Base):
     timestamp = Column(DateTime, default=datetime.utcnow)
 
     question = relationship("Question", back_populates="attempts")
+
+class SubjectPerformance(Base):
+    __tablename__ = "subject_performance"
+
+    id = Column(Integer, primary_key=True, index=True)
+    subject = Column(String, unique=True, index=True)
+    highest_difficulty_reached = Column(Integer, default=50)
+    current_title = Column(String, default="The Academy Student (Gifted)")
+    streak = Column(Integer, default=0)

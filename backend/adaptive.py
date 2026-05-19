@@ -1,6 +1,7 @@
 import random
+import math
 from sqlalchemy.orm import Session
-from . import models, schemas
+from . import models, schemas, constants
 
 def get_adaptive_question(db: Session):
     # Tier probabilities: 1:35%, 2:25%, 3:15%, 4:10%, 5:8%, 6:5%, 7:2%
@@ -9,19 +10,34 @@ def get_adaptive_question(db: Session):
 
     selected_tier = random.choices(tiers, weights=weights, k=1)[0]
 
-    # Try to get a question from the selected tier
-    question = db.query(models.Question).filter(models.Question.virtual_tier == selected_tier).order_by(models.Question.frequency_score).first()
+    # Get questions from the selected tier
+    questions = db.query(models.Question).filter(models.Question.virtual_tier == selected_tier).all()
 
     # Fallback if tier is empty
-    if not question:
-        question = db.query(models.Question).order_by(models.Question.frequency_score).first()
+    if not questions:
+        questions = db.query(models.Question).limit(50).all()
 
-    if question:
-        question.frequency_score += 1
+    if not questions:
+        return None
+
+    # Calculate weights based on Memory and Difficulty
+    # Weight = (Difficulty + 0.1) * (105 - MemoryValue)
+    # Correct (100) -> 5, Unattempted (50) -> 55, Unappeared (0) -> 105, Incorrect (-50) -> 155
+    q_weights = []
+    for q in questions:
+        m_val = q.memory_value if q.memory_value is not None else 0
+        memory_factor = 105 - m_val
+        difficulty_factor = (q.difficulty if q.difficulty is not None else 0) + 0.1
+        q_weights.append(memory_factor * difficulty_factor)
+
+    selected_question = random.choices(questions, weights=q_weights, k=1)[0]
+
+    if selected_question:
+        selected_question.frequency_score += 1
         db.commit()
-        db.refresh(question)
+        db.refresh(selected_question)
 
-    return question
+    return selected_question
 
 def calculate_attempt_metrics(db: Session, attempt: schemas.AttemptCreate, question: models.Question):
     # Basic logic for Panic, Fatigue, and Momentum
@@ -52,6 +68,12 @@ def process_attempt(db: Session, attempt_data: schemas.AttemptCreate):
     if not question:
         raise Exception("Question not found")
 
+    # Update subject performance
+    perf = db.query(models.SubjectPerformance).filter(models.SubjectPerformance.subject == question.subject).first()
+    if not perf:
+        perf = models.SubjectPerformance(subject=question.subject)
+        db.add(perf)
+
     # Secure verification
     is_correct = attempt_data.selected_option == question.correct_option
     attempt_dict = attempt_data.dict()
@@ -68,6 +90,27 @@ def process_attempt(db: Session, attempt_data: schemas.AttemptCreate):
         fatigue_score=fatigue_score,
         momentum_delta=momentum_delta
     )
+
+    # Memory System Update
+    if attempt_data.selected_option is None:
+        question.memory_value = 50 # Unattempted
+        perf.streak = 0
+    elif is_correct:
+        question.memory_value = 100 # Correct
+        perf.streak += 1
+        # Dynamic Scaling if difficulty > 100
+        if question.difficulty >= 100:
+            step_base = 5.0
+            delta_d = step_base * math.log10(perf.streak + 1)
+            perf.highest_difficulty_reached = int(perf.highest_difficulty_reached + delta_d)
+        else:
+            perf.highest_difficulty_reached = max(perf.highest_difficulty_reached, int(question.difficulty * 100) + 10)
+    else:
+        question.memory_value = -50 # Incorrect
+        perf.streak = 0
+
+    # Update Title
+    perf.current_title = constants.get_title_for_difficulty(perf.highest_difficulty_reached)
 
     # Tier Transition Logic
     if is_correct:

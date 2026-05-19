@@ -11,7 +11,15 @@ def parse_question_with_ai(image_bytes: bytes, api_key: str):
     prompt = """
     Analyze this image of a JEE question.
     Extract the question text, options, subject, and chapter.
-    Also estimate the difficulty (0.0 to 1.0).
+    Also estimate the difficulty.
+
+    RATING INSTRUCTIONS:
+    - Standard JEE Mains: 0.0 to 0.6
+    - Standard JEE Advanced: 0.6 to 1.0
+    - If the question requires multi-step synthesis across multiple chapters, or introduces Olympiad/RMO-level mathematical rigour, you are authorized to break the 1.0 ceiling.
+    - Rate up to 2.0 for Olympiad level.
+    - Rate up to 10.0 ONLY if the question is a historically famous unsolved or unquantifiable problem adapted for a JEE template.
+
     Return the result in JSON format:
     {
       "text": "question text here",
@@ -19,7 +27,7 @@ def parse_question_with_ai(image_bytes: bytes, api_key: str):
       "correct_option": index_of_correct_option_if_known_else_-1,
       "subject": "Physics/Chemistry/Mathematics",
       "chapter": "Chapter Name",
-      "difficulty": 0.5
+      "difficulty": 0.85
     }
     """
 

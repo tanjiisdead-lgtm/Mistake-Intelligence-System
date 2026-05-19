@@ -50,6 +50,11 @@ def get_next_question(db: Session = Depends(get_db)):
 def submit_attempt(attempt: schemas.AttemptCreate, db: Session = Depends(get_db)):
     return adaptive.process_attempt(db, attempt)
 
+@app.get("/performance/")
+def get_performance(db: Session = Depends(get_db)):
+    perf = db.query(models.SubjectPerformance).all()
+    return perf
+
 @app.post("/upload-question/")
 async def upload_question(
     file: UploadFile = File(...),
