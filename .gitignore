@@ -1,0 +1,13 @@
+backend/venv/
+backend/__pycache__/
+__pycache__/
+.pytest_cache/
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+.env
+*.db
+*.log
+exports/
+verification/
+EOF
